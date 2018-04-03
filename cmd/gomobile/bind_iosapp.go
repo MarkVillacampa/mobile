@@ -194,6 +194,7 @@ var iosBindHeaderTmpl = template.Must(template.New("ios.h").Parse(`
 #ifndef __{{.title}}_FRAMEWORK_H__
 #define __{{.title}}_FRAMEWORK_H__
 
+#include "ref.h"
 {{range .bases}}#include "{{.}}.objc.h"
 {{end}}
 #endif
