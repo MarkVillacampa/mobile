@@ -27,7 +27,8 @@ type ObjcGen struct {
 	*Generator
 
 	// fields set by init.
-	namePrefix string
+	namePrefix  string
+	packageName string
 	// Map of all wrapped Objc types
 	wrapMap map[string]*objc.Named
 	// Structs that embeds Objc wrapper types.
@@ -50,6 +51,11 @@ type objcClassInfo struct {
 func (g *ObjcGen) Init(wrappers []*objc.Named) {
 	g.Generator.Init()
 	g.namePrefix = g.namePrefixOf(g.Pkg)
+	if g.Pkg == nil {
+		g.packageName = "Universe"
+	} else {
+		g.packageName = strings.Title(g.Pkg.Name())
+	}
 	g.wrapMap = make(map[string]*objc.Named)
 	g.constructors = make(map[*types.TypeName][]*types.Func)
 	modMap := make(map[string]struct{})
@@ -100,8 +106,18 @@ func (g *ObjcGen) namePrefixOf(pkg *types.Package) string {
 	if pkg == nil {
 		return "Universe"
 	}
-	p := g.Prefix
-	return p + strings.Title(pkg.Name())
+	if g.Prefix != "" {
+		return g.Prefix
+	} else {
+		return strings.Title(pkg.Name())
+	}
+}
+
+func (g *ObjcGen) filenameFor(pkg *types.Package) string {
+	if pkg == nil {
+		return "Universe"
+	}
+	return g.Prefix + strings.Title(pkg.Name())
 }
 
 func (g *ObjcGen) GenGoH() error {
@@ -143,8 +159,8 @@ func (g *ObjcGen) GenH() error {
 		pkgPath = g.Pkg.Path()
 	}
 	g.Printf(objcPreamble, pkgPath, g.gobindOpts(), pkgPath)
-	g.Printf("#ifndef __%s_H__\n", g.namePrefix)
-	g.Printf("#define __%s_H__\n", g.namePrefix)
+	g.Printf("#ifndef __%s_H__\n", g.packageName)
+	g.Printf("#define __%s_H__\n", g.packageName)
 	g.Printf("\n")
 	for _, m := range g.modules {
 		g.Printf("@import %s;\n", m)
@@ -156,7 +172,7 @@ func (g *ObjcGen) GenH() error {
 	if g.Pkg != nil {
 		for _, pkg := range g.Pkg.Imports() {
 			if g.validPkg(pkg) {
-				g.Printf("#include %q\n", g.namePrefixOf(pkg)+".objc.h")
+				g.Printf("#include %q\n", g.filenameFor(g.Pkg)+".objc.h")
 			}
 		}
 	}
@@ -267,7 +283,7 @@ func (g *ObjcGen) GenM() error {
 	g.Printf("#include <Foundation/Foundation.h>\n")
 	g.Printf("#include \"seq.h\"\n")
 	g.Printf("#include \"_cgo_export.h\"\n")
-	g.Printf("#include %q\n", g.namePrefix+".objc.h")
+	g.Printf("#include %q\n", g.filenameFor(g.Pkg)+".objc.h")
 	g.Printf("\n")
 
 	// struct
