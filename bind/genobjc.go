@@ -189,6 +189,14 @@ func (g *ObjcGen) GenH() error {
 			// Forward declaration for other cases will be handled at the beginning of GenM.
 		}
 	}
+	for _, n := range g.otherNames {
+		named := n.Type().(*types.Named)
+		t := named.Underlying()
+		switch t.(type) {
+		case *types.Basic:
+			g.Printf("typedef %s %s%s;\n", g.objcType(t), g.namePrefix, n.Name())
+		}
+	}
 	if len(g.structs) > 0 || len(g.interfaces) > 0 {
 		g.Printf("\n")
 	}
@@ -206,16 +214,29 @@ func (g *ObjcGen) GenH() error {
 	// const
 	// TODO: prefix with k?, or use a class method?
 	for _, obj := range g.constants {
-		if _, ok := obj.Type().(*types.Basic); !ok || !g.isSupported(obj.Type()) {
-			g.Printf("// skipped const %s with unsupported type: %s\n\n", obj.Name(), obj.Type())
+		var t = obj.Type()
+		var typeName = g.objcType(t)
+		var constName = g.namePrefix + obj.Name()
+
+		if named, ok := obj.Type().(*types.Named); ok {
+			t = named.Underlying()
+		}
+
+		if _, ok := t.(*types.Basic); !ok || !g.isSupported(t) {
+			g.Printf("// skipped const %s with unsupported type: %T\n\n", constName, t)
 			continue
 		}
-		g.objcdoc(g.docs[obj.Name()].Doc())
-		switch b := obj.Type().(*types.Basic); b.Kind() {
-		case types.String, types.UntypedString:
-			g.Printf("FOUNDATION_EXPORT NSString* const %s%s;\n", g.namePrefix, obj.Name())
-		default:
-			g.Printf("FOUNDATION_EXPORT const %s %s%s;\n", g.objcType(obj.Type()), g.namePrefix, obj.Name())
+
+		switch t.(type) {
+		case *types.Basic:
+			g.objcdoc(g.docs[obj.Name()].Doc())
+			t := t.(*types.Basic)
+			switch t.Kind() {
+			case types.String, types.UntypedString:
+				g.Printf("FOUNDATION_EXPORT %s const %s;\n", typeName, constName)
+			default:
+				g.Printf("FOUNDATION_EXPORT const %s %s;\n", typeName, constName)
+			}
 		}
 	}
 	if len(g.constants) > 0 {
@@ -380,14 +401,19 @@ func (g *ObjcGen) genVarM(o *types.Var) {
 }
 
 func (g *ObjcGen) genConstM(o *types.Const) {
-	if _, ok := o.Type().(*types.Basic); !ok || !g.isSupported(o.Type()) {
-		g.Printf("// skipped const %s with unsupported type: %s\n\n", o.Name(), o.Type())
-		return
+
+	var b *types.Basic
+	var ok bool
+	if _, ok = o.Type().(*types.Basic); !ok || !g.isSupported(o.Type()) {
+		if b, ok = o.Type().Underlying().(*types.Basic); !ok {
+			g.Printf("// skipped const %s with unsupported type: %T\n\n", o.Name(), o.Type())
+			return
+		}
 	}
 	cName := fmt.Sprintf("%s%s", g.namePrefix, o.Name())
-	objcType := g.objcType(o.Type())
+	objcType := g.objcType(b)
 
-	switch b := o.Type().(*types.Basic); b.Kind() {
+	switch b.Kind() {
 	case types.Bool, types.UntypedBool:
 		v := "NO"
 		if constant.BoolVal(o.Val()) {
@@ -718,6 +744,13 @@ func (g *ObjcGen) genWrite(varName string, t types.Type, mode varMode) {
 		switch u := t.Underlying().(type) {
 		case *types.Interface:
 			g.genRefWrite(varName)
+		case *types.Basic:
+			switch u.Kind() {
+			case types.String:
+				g.Printf("nstring _%s = go_seq_from_objc_string(%s);\n", varName, varName)
+			default:
+				g.Printf("%s _%s = (%s)%s;\n", g.cgoType(u), varName, g.cgoType(u), varName)
+			}
 		default:
 			g.errorf("unsupported named type: %s / %T", u, u)
 		}
@@ -789,9 +822,18 @@ func (g *ObjcGen) genRead(toName, fromName string, t types.Type, mode varMode) {
 			g.errorf("unsupported type %s", t)
 		}
 	case *types.Named:
-		switch t.Underlying().(type) {
+		switch a := t.Underlying().(type) {
 		case *types.Interface, *types.Pointer:
 			g.genRefRead(toName, fromName, t)
+		case *types.Basic:
+			switch a.Kind() {
+			case types.String:
+				g.Printf("NSString *%s = go_seq_to_objc_string(%s);\n", toName, fromName)
+			case types.Bool:
+				g.Printf("BOOL %s = %s ? YES : NO;\n", toName, fromName)
+			default:
+				g.Printf("%s %s = (%s)%s;\n", g.objcType(a), toName, g.objcType(a), fromName)
+			}
 		default:
 			g.errorf("unsupported, direct named type %s", t)
 		}
@@ -1377,7 +1419,7 @@ func (g *ObjcGen) objcType(typ types.Type) string {
 			} else {
 				return g.namePrefixOf(n.Pkg()) + n.Name() + "*"
 			}
-		case *types.Struct:
+		case *types.Struct, *types.Basic:
 			return g.namePrefixOf(n.Pkg()) + n.Name()
 		}
 		g.errorf("unsupported, named type %s", typ)

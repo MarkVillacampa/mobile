@@ -136,6 +136,16 @@ func (g *goGen) genWrite(toVar, fromVar string, t types.Type, mode varMode) {
 		switch u := t.Underlying().(type) {
 		case *types.Interface, *types.Pointer:
 			g.genToRefNum(toVar, fromVar)
+		case *types.Basic:
+			switch u.Kind() {
+			case types.String:
+				g.Printf("%s := encodeString(string(%s))\n", toVar, fromVar)
+			case types.Bool:
+				g.Printf("var %s C.%s = 0\n", toVar, g.cgoType(t))
+				g.Printf("if %s { %s = 1 }\n", fromVar, toVar)
+			default:
+				g.Printf("%s := C.%s(%s)\n", toVar, g.cgoType(t), fromVar)
+			}
 		default:
 			g.errorf("unsupported, direct named type %s: %s", t, u)
 		}
@@ -421,7 +431,7 @@ func (g *goGen) genRead(toVar, fromVar string, typ types.Type, mode varMode) {
 			g.errorf("unsupported pointer type %s", t)
 		}
 	case *types.Named:
-		switch t.Underlying().(type) {
+		switch u := t.Underlying().(type) {
 		case *types.Interface, *types.Pointer:
 			hasProxy := true
 			if iface, ok := t.Underlying().(*types.Interface); ok {
@@ -457,6 +467,15 @@ func (g *goGen) genRead(toVar, fromVar string, typ types.Type, mode varMode) {
 			}
 			g.Printf("	}\n")
 			g.Printf("}\n")
+		case *types.Basic:
+			switch u.Kind() {
+			case types.String:
+				g.Printf("%s := %s.%s(decodeString(%s))\n", toVar, pkgPrefix(t.Obj().Pkg()), t.Obj().Name(), fromVar)
+			case types.Bool:
+				g.Printf("%s := %s != 0\n", toVar, fromVar)
+			default:
+				g.Printf("%s := %s.%s(%s)\n", toVar, pkgPrefix(t.Obj().Pkg()), t.Obj().Name(), fromVar)
+			}
 		default:
 			g.errorf("unsupported named type %s", t)
 		}
@@ -481,7 +500,7 @@ func (g *goGen) typeString(typ types.Type) string {
 		}
 
 		switch t.Underlying().(type) {
-		case *types.Interface, *types.Struct:
+		case *types.Interface, *types.Struct, *types.Basic:
 			return fmt.Sprintf("%s%s", g.pkgName(oPkg), types.TypeString(typ, types.RelativeTo(oPkg)))
 		default:
 			g.errorf("unsupported named type %s / %T", t, t)

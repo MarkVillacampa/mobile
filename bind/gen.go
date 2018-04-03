@@ -405,7 +405,12 @@ func (g *Generator) cgoType(t types.Type) string {
 		}
 		g.errorf("unsupported pointer to type: %s", t)
 	case *types.Named:
-		return "int32_t"
+		switch u := t.Underlying().(type) {
+		case *types.Basic:
+			return g.cgoType(u)
+		default:
+			return "int32_t"
+		}
 	default:
 		g.errorf("unsupported type: %s", t)
 	}
@@ -511,6 +516,8 @@ func (g *Generator) isSupported(t types.Type) bool {
 		switch t.Underlying().(type) {
 		case *types.Interface, *types.Pointer:
 			return g.validPkg(t.Obj().Pkg())
+		case *types.Basic:
+			return true
 		}
 	}
 	return false
