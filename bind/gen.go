@@ -12,6 +12,7 @@ import (
 	"go/types"
 	"io"
 	"regexp"
+	"runtime"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -354,7 +355,9 @@ func toCFlag(v bool) int {
 }
 
 func (g *Generator) errorf(format string, args ...interface{}) {
-	g.err = append(g.err, fmt.Errorf(format, args...))
+	pc, fn, line, _ := runtime.Caller(1)
+	args = append(args, runtime.FuncForPC(pc).Name(), fn, line)
+	g.err = append(g.err, fmt.Errorf(format+" %s[%s:%d]", args...))
 }
 
 // cgoType returns the name of a Cgo type suitable for converting a value of

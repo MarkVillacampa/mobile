@@ -9,6 +9,7 @@ import (
 	"go/constant"
 	"go/types"
 	"math"
+	"runtime"
 	"strings"
 
 	"golang.org/x/mobile/internal/importers/objc"
@@ -1335,7 +1336,9 @@ func (g *ObjcGen) genInitM(obj *types.TypeName, f *types.Func) {
 }
 
 func (g *ObjcGen) errorf(format string, args ...interface{}) {
-	g.err = append(g.err, fmt.Errorf(format, args...))
+	pc, fn, line, _ := runtime.Caller(1)
+	args = append(args, runtime.FuncForPC(pc).Name(), fn, line)
+	g.err = append(g.err, fmt.Errorf(format+" %s[%s:%d]", args...))
 }
 
 func (g *ObjcGen) refTypeBase(typ types.Type) string {
