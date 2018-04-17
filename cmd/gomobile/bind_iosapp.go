@@ -117,6 +117,12 @@ func goIOSBind(gobind string, pkgs []*build.Package, archs []string) error {
 		if err != nil {
 			return err
 		}
+		err = copyFile(
+			headers+"/GoArray.h",
+			srcDir+"/GoArray.h")
+		if err != nil {
+			return err
+		}
 		headerFiles = append(headerFiles, title+".h")
 		err = writeFile(headers+"/"+title+".h", func(w io.Writer) error {
 			return iosBindHeaderTmpl.Execute(w, map[string]interface{}{
@@ -169,6 +175,7 @@ const iosBindInfoPlist = `<?xml version="1.0" encoding="UTF-8"?>
 
 var iosModuleMapTmpl = template.Must(template.New("iosmmap").Parse(`framework module "{{.Module}}" {
 	header "ref.h"
+	header "GoArray.h"
 {{range .Headers}}    header "{{.}}"
 {{end}}
     export *

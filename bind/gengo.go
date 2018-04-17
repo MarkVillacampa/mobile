@@ -120,6 +120,15 @@ func (g *goGen) genWrite(toVar, fromVar string, t types.Type, mode varMode) {
 			default:
 				g.errorf("unsupported type: %s", t)
 			}
+		case *types.Pointer:
+			// TODO(crawshaw): test *int
+			// TODO(crawshaw): test **Generator
+			switch t := e.Elem().(type) {
+			case *types.Named:
+				g.genToRefNumPointer(toVar, fromVar)
+			default:
+				g.errorf("unsupported type %s", t)
+			}
 		default:
 			g.errorf("unsupported type: %s", t)
 		}
@@ -161,6 +170,13 @@ func (g *goGen) genToRefNum(toVar, fromVar string) {
 	g.Printf("var %s C.int32_t = _seq.NullRefNum\n", toVar)
 	g.Printf("if %s != nil {\n", fromVar)
 	g.Printf("	%s = C.int32_t(_seq.ToRefNum(%s))\n", toVar, fromVar)
+	g.Printf("}\n")
+}
+
+func (g *goGen) genToRefNumPointer(toVar, fromVar string) {
+	g.Printf("var %s C.int32_t = _seq.NullRefNum\n", toVar)
+	g.Printf("if %s != nil {\n", fromVar)
+	g.Printf("	%s = C.int32_t(_seq.ToRefNum(&%s))\n", toVar, fromVar)
 	g.Printf("}\n")
 }
 
@@ -409,6 +425,24 @@ func (g *goGen) genRead(toVar, fromVar string, typ types.Type, mode varMode) {
 				g.Printf("%s := toSlice(%s, %v)\n", toVar, fromVar, mode == modeRetained)
 			default:
 				g.errorf("unsupported type: %s", t)
+			}
+		case *types.Pointer:
+			switch u := e.Elem().(type) {
+			case *types.Named:
+				o := u.Obj()
+				oPkg := o.Pkg()
+				if !g.validPkg(oPkg) {
+					g.errorf("type %s is defined in %s, which is not bound", u, oPkg)
+					return
+				}
+				g.Printf("// Must be a Go object\n")
+				g.Printf("var %s []*%s%s\n", toVar, g.pkgName(oPkg), o.Name())
+				g.Printf("if %s_ref := _seq.FromRefNum(int32(%s)); %s_ref != nil {\n", toVar, fromVar, toVar)
+				g.Printf("interf := *%s_ref.Get().(*interface{})\n", toVar)
+				g.Printf("  %s = interf.([]*%s%s)\n", toVar, g.pkgName(oPkg), o.Name())
+				g.Printf("}\n")
+			default:
+				g.errorf("unsupported pointer type %s", t)
 			}
 		default:
 			g.errorf("unsupported type: %s", t)

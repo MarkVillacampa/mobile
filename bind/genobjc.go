@@ -305,6 +305,7 @@ func (g *ObjcGen) GenM() error {
 	g.Printf("#include \"seq.h\"\n")
 	g.Printf("#include \"_cgo_export.h\"\n")
 	g.Printf("#include %q\n", g.filenameFor(g.Pkg)+".objc.h")
+	g.Printf("#include %q\n", "GoArray.h")
 	g.Printf("\n")
 
 	// struct
@@ -737,6 +738,8 @@ func (g *ObjcGen) genWrite(varName string, t types.Type, mode varMode) {
 			default:
 				g.errorf("unsupported type: %s", t)
 			}
+		case *types.Pointer:
+			g.genRefWrite(varName)
 		default:
 			g.errorf("unsupported type: %s", t)
 		}
@@ -791,6 +794,22 @@ func (g *ObjcGen) genRefRead(toName, fromName string, t types.Type) {
 	g.Printf("}\n")
 }
 
+func (g *ObjcGen) genSliceRefRead(toName, fromName string, t types.Type) {
+	ptype := g.refTypeBase(t)
+	g.Printf("GoArray<%s*> *%s = nil;\n", ptype, toName)
+	g.Printf("GoSeqRef* %s_ref = go_seq_from_refnum(%s);\n", toName, fromName)
+	g.Printf("if (%s_ref != NULL) {\n", toName)
+	g.Printf("	%s = %s_ref.obj;\n", toName, toName)
+	g.Printf("	if (%s == nil) {\n", toName)
+	if isObjcType(t) {
+		g.Printf("		LOG_FATAL(@\"unexpected NULL reference\");\n")
+	} else {
+		g.Printf("		%s = [[GoArray<%s*> alloc] initWithRef:%s_ref  class: [%s class]];\n", toName, ptype, toName, ptype)
+	}
+	g.Printf("	}\n")
+	g.Printf("}\n")
+}
+
 func (g *ObjcGen) genRead(toName, fromName string, t types.Type, mode varMode) {
 	switch t := t.(type) {
 	case *types.Basic:
@@ -811,6 +830,8 @@ func (g *ObjcGen) genRead(toName, fromName string, t types.Type, mode varMode) {
 			default:
 				g.errorf("unsupported type: %s", t)
 			}
+		case *types.Pointer:
+			g.genSliceRefRead(toName, fromName, e)
 		default:
 			g.errorf("unsupported type: %s", t)
 		}
@@ -1394,6 +1415,10 @@ func (g *ObjcGen) objcType(typ types.Type) string {
 		}
 		// TODO(hyangah): support other slice types: NSArray or CFArrayRef.
 		// Investigate the performance implication.
+		switch typ.Elem().(type) {
+		case *types.Pointer:
+			return fmt.Sprintf("NSArray<%s>*", g.objcType(typ.Elem()))
+		}
 		g.errorf("unsupported type: %s", typ)
 		return "TODO"
 	case *types.Pointer:

@@ -161,6 +161,9 @@ func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types
 			copyFile(filepath.Join("src", "gobind", "seq_darwin.go"), filepath.Join(objcPkg.Dir, "seq_darwin.go.support"))
 			copyFile(filepath.Join("src", "gobind", "ref.h"), filepath.Join(objcPkg.Dir, "ref.h"))
 			copyFile(filepath.Join("src", "gobind", "seq_darwin.h"), filepath.Join(objcPkg.Dir, "seq_darwin.h"))
+			copyFile(filepath.Join("src", "gobind", "GoArray.h"), filepath.Join(objcPkg.Dir, "GoArray.h"))
+			copyFile(filepath.Join("src", "gobind", "GoArray.m"), filepath.Join(objcPkg.Dir, "GoArray.m"))
+			copyFile(filepath.Join("src", "gobind", "GoArray.go"), filepath.Join(objcPkg.Dir, "GoArray.go"))
 		}
 	default:
 		errorf("unknown target language: %q", lang)

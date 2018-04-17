@@ -394,10 +394,10 @@ func (g *Generator) cgoType(t types.Type) string {
 			case types.Uint8: // Byte.
 				return "nbyteslice"
 			default:
-				g.errorf("unsupported slice type: %s", t)
+				return "int32_t"
 			}
 		default:
-			g.errorf("unsupported slice type: %s", t)
+			return "int32_t"
 		}
 	case *types.Pointer:
 		if _, ok := t.Elem().(*types.Named); ok {
@@ -506,6 +506,8 @@ func (g *Generator) isSupported(t types.Type) bool {
 		switch e := t.Elem().(type) {
 		case *types.Basic:
 			return e.Kind() == types.Uint8
+		case *types.Pointer:
+			return true
 		}
 	case *types.Pointer:
 		switch t := t.Elem().(type) {
