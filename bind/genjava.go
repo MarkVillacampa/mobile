@@ -574,14 +574,22 @@ func (g *JavaGen) genInterface(iface interfaceInfo) {
 }
 
 func isJavaPrimitive(T types.Type) bool {
-	b, ok := T.(*types.Basic)
-	if !ok {
-		return false
-	}
-	switch b.Kind() {
-	case types.Bool, types.Uint8, types.Float32, types.Float64,
-		types.Int, types.Int8, types.Int16, types.Int32, types.Int64:
-		return true
+	switch b := T.(type) {
+	case *types.Basic:
+		switch b.Kind() {
+		case types.Bool, types.Uint8, types.Float32, types.Float64,
+			types.Int, types.Int8, types.Int16, types.Int32, types.Int64:
+			return true
+		}
+	case *types.Named:
+		switch c := b.Underlying().(type) {
+		case *types.Basic:
+			switch c.Kind() {
+			case types.Bool, types.Uint8, types.Float32, types.Float64,
+				types.Int, types.Int8, types.Int16, types.Int32, types.Int64:
+				return true
+			}
+		}
 	}
 	return false
 }
@@ -627,7 +635,13 @@ func (g *JavaGen) jniType(T types.Type) string {
 		}
 		g.errorf("unsupported pointer to type: %s", T)
 	case *types.Named:
-		return "jobject"
+		switch u := T.Underlying().(type) {
+		case *types.Basic:
+			return g.jniType(u)
+		default:
+			return "jobject"
+		}
+
 	default:
 		g.errorf("unsupported jniType: %#+v, %s\n", T, T)
 	}
@@ -694,6 +708,12 @@ func (g *JavaGen) javaType(T types.Type) string {
 			g.errorf("type %s is in %s, which is not bound", n.Name(), nPkg)
 			break
 		}
+
+		switch u := T.Underlying().(type) {
+		case *types.Basic:
+			return g.javaBasicType(u)
+		}
+
 		// TODO(crawshaw): more checking here
 		clsName := n.Name()
 		if nPkg != g.Pkg {
@@ -900,6 +920,13 @@ func (g *JavaGen) genJavaToC(varName string, t types.Type, mode varMode) {
 		switch u := t.Underlying().(type) {
 		case *types.Interface:
 			g.Printf("int32_t _%s = go_seq_to_refnum(env, %s);\n", varName, varName)
+		case *types.Basic:
+			switch u.Kind() {
+			case types.String:
+				g.Printf("nstring _%s = go_seq_from_java_string(env, %s);\n", varName, varName)
+			default:
+				g.Printf("%s _%s = (%s)%s;\n", g.cgoType(t), varName, g.cgoType(t), varName)
+			}
 		default:
 			g.errorf("unsupported named type: %s / %T", u, u)
 		}
@@ -943,9 +970,18 @@ func (g *JavaGen) genCToJava(toName, fromName string, t types.Type, mode varMode
 			g.errorf("unsupported type %s", t)
 		}
 	case *types.Named:
-		switch t.Underlying().(type) {
+		switch a := t.Underlying().(type) {
 		case *types.Interface, *types.Pointer:
 			g.genFromRefnum(toName, fromName, t, t.Obj())
+		case *types.Basic:
+			switch a.Kind() {
+			case types.String:
+				g.Printf("jstring %s = go_seq_to_java_string(env, %s);\n", toName, fromName)
+			case types.Bool:
+				g.Printf("jboolean %s = %s ? JNI_TRUE : JNI_FALSE;\n", toName, fromName)
+			default:
+				g.Printf("%s %s = (%s)%s;\n", g.jniType(t), toName, g.jniType(t), fromName)
+			}
 		default:
 			g.errorf("unsupported, direct named type %s", t)
 		}
@@ -1020,15 +1056,19 @@ func JavaClassName(pkg *types.Package) string {
 }
 
 func (g *JavaGen) genConst(o *types.Const) {
-	if _, ok := o.Type().(*types.Basic); !ok || !g.isSupported(o.Type()) {
-		g.Printf("// skipped const %s with unsupported type: %s\n\n", o.Name(), o.Type())
-		return
+	var b *types.Basic
+	var ok bool
+	if _, ok = o.Type().(*types.Basic); !ok || !g.isSupported(o.Type()) {
+		if b, ok = o.Type().Underlying().(*types.Basic); !ok {
+			g.Printf("// skipped const %s with unsupported type: %T\n\n", o.Name(), o.Type())
+			return
+		}
 	}
 	// TODO(hyangah): should const names use upper cases + "_"?
 	// TODO(hyangah): check invalid names.
-	jType := g.javaType(o.Type())
+	jType := g.javaType(b)
 	val := o.Val().ExactString()
-	switch b := o.Type().(*types.Basic); b.Kind() {
+	switch b.Kind() {
 	case types.Int64, types.UntypedInt:
 		i, exact := constant.Int64Val(o.Val())
 		if !exact {
@@ -1050,7 +1090,7 @@ func (g *JavaGen) genConst(o *types.Const) {
 		val = fmt.Sprintf("%g", f)
 	}
 	g.javadoc(g.docs[o.Name()].Doc())
-	g.Printf("public static final %s %s = %s;\n", g.javaType(o.Type()), o.Name(), val)
+	g.Printf("public static final %s %s = %s;\n", g.javaType(b), o.Name(), val)
 }
 
 func (g *JavaGen) genJNIField(o *types.TypeName, f *types.Var) {
