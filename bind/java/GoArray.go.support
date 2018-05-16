@@ -1,0 +1,90 @@
+package main
+
+/*
+#cgo CFLAGS: -Werror
+
+#include <stdint.h>
+#include <stdlib.h>
+*/
+import "C"
+
+import (
+	"fmt"
+	"reflect"
+
+	_seq "golang.org/x/mobile/bind/seq"
+)
+
+//export goArray_size
+func goArray_size(refnum C.int32_t) C.int {
+	ref := _seq.FromRefNum(int32(refnum))
+	v := ref.Get()
+	l := reflect.ValueOf(v).Elem()
+	arr := reflect.ValueOf(l.Interface())
+	return C.int(arr.Len())
+}
+
+//export goArray_get
+func goArray_get(refnum C.int32_t, index C.int) C.int32_t {
+	ref := _seq.FromRefNum(int32(refnum))
+	v := ref.Get()
+	o := reflect.ValueOf(v).Elem()
+	arr := reflect.ValueOf(o.Interface())
+	obj := arr.Index(int(index))
+	fmt.Printf("go_objectAtIndex(%d): (%v, %T)\n", int(index), obj, obj)
+	return C.int32_t(_seq.ToRefNum(obj.Interface()))
+}
+
+//export goArray_set
+func goArray_set(refnum C.int32_t, index C.int, objref C.int32_t) C.int32_t {
+	ref := _seq.FromRefNum(int32(refnum))
+	v := ref.Get()
+	o := reflect.ValueOf(v).Elem()
+	arr := reflect.ValueOf(o.Interface())
+	obj := _seq.FromRefNum(int32(objref)).Get()
+	arr.Index(int(index)).Set(reflect.ValueOf(obj))
+	return refnum
+	// v[int(index)] = int(obj)
+}
+
+//export goArray_add
+func goArray_add(refnum C.int32_t, index C.int, objref C.int32_t) {
+	ref := _seq.FromRefNum(int32(refnum))
+	v := ref.Get()
+	o := reflect.ValueOf(v).Elem()
+	arr := reflect.ValueOf(o.Interface())
+	obj := _seq.FromRefNum(int32(objref)).Get()
+	first := arr.Slice(0, int(index))
+	second := arr.Slice(int(index), arr.Len())
+	newslice := reflect.Append(first, reflect.ValueOf(obj))
+	newslice = reflect.AppendSlice(newslice, second)
+	o.Set(newslice)
+}
+
+//export goArray_remove
+func goArray_remove(refnum C.int32_t, index C.int) C.int32_t {
+	ref := _seq.FromRefNum(int32(refnum))
+	v := ref.Get()
+	optr := reflect.ValueOf(v)
+	o := optr.Elem()
+	arr := reflect.ValueOf(o.Interface())
+	first := arr.Slice(0, int(index))
+	second := arr.Slice(int(index)+1, arr.Len())
+	newslice := reflect.AppendSlice(first, second)
+	o.Set(newslice)
+	// v = append(v[:index], v[index+1:]...)
+	return refnum
+}
+
+//export go_new_slice
+func go_new_slice(refnum C.int32_t) C.int32_t {
+	fmt.Printf("creating slice with object with refnum %s\n", int32(refnum))
+	ref := _seq.FromRefNum(int32(refnum))
+	v := ref.Get()
+	t := reflect.TypeOf(v)
+	a := reflect.MakeSlice(reflect.SliceOf(t), 0, 0)
+	fmt.Printf("go_new_slice: (%v, %T)\n", a, a)
+	i := a.Interface()
+	fmt.Printf("go_new_slice: (%v, %T)\n", i, i)
+	return C.int32_t(_seq.ToRefNum(&i))
+}

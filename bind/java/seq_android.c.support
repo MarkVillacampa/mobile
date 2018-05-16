@@ -274,6 +274,36 @@ jstring go_seq_to_java_string(JNIEnv *env, nstring str) {
 	return s;
 }
 
+jobject go_seq_to_java_array(JNIEnv *env, int32_t ref, jclass klass) {
+	printf("refnum: %i\n", ref);
+	jclass clazz = (*env)->FindClass(env, "go/GoArray");
+	printf("1\n");
+	if (clazz == NULL) {
+		printf("its null\n");
+	}
+    jclass GoArray = (*env)->NewGlobalRef(env, clazz);
+	printf("2\n");
+	if (GoArray == NULL) {
+		printf("its null\n");
+	}
+
+	if (ref == NULL_REFNUM) {
+		jmethodID GoArray_constructor = (*env)->GetMethodID(env, clazz, "<init>", "(Ljava/lang/Class;)V");
+		printf("3\n");
+		if (GoArray_constructor == NULL) {
+			printf("its null\n");
+		}
+		return (*env)->NewObject(env, GoArray, GoArray_constructor, klass);
+	} else {
+		jmethodID GoArray_constructor = (*env)->GetMethodID(env, clazz, "<init>", "(ILjava/lang/Class;)V");
+		printf("4\n");
+		if (GoArray_constructor == NULL) {
+			printf("its null\n");
+		}
+		return (*env)->NewObject(env, GoArray, GoArray_constructor, ref, klass);
+	}
+}
+
 // go_seq_push_local_frame retrieves or creates the JNIEnv* for the current thread
 // and pushes a JNI reference frame. Must be matched with call to go_seq_pop_local_frame.
 JNIEnv *go_seq_push_local_frame(jint nargs) {

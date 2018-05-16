@@ -51,6 +51,7 @@ extern void go_seq_release_byte_array(JNIEnv *env, jbyteArray arr, jbyte* ptr);
 
 extern jstring go_seq_to_java_string(JNIEnv *env, nstring str);
 extern nstring go_seq_from_java_string(JNIEnv *env, jstring s);
+extern jobject go_seq_to_java_array(JNIEnv *env, int32_t ref, jclass klass);
 
 // push_local_frame retrieves or creates the JNIEnv* for the current thread
 // and pushes a JNI reference frame. Must be matched with call to pop_local_frame.

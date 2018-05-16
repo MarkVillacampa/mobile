@@ -86,7 +86,7 @@ func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types
 				return
 			}
 			repo := filepath.Clean(filepath.Join(p.Dir, "..")) // golang.org/x/mobile directory.
-			for _, javaFile := range []string{"Seq.java", "LoadJNI.java"} {
+			for _, javaFile := range []string{"Seq.java", "LoadJNI.java", "GoArray.java"} {
 				src := filepath.Join(repo, "bind/java/"+javaFile)
 				in, err := os.Open(src)
 				if err != nil {
@@ -109,6 +109,8 @@ func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types
 			copyFile(filepath.Join("src", "gobind", "seq_android.c"), filepath.Join(javaPkg.Dir, "seq_android.c.support"))
 			copyFile(filepath.Join("src", "gobind", "seq_android.go"), filepath.Join(javaPkg.Dir, "seq_android.go.support"))
 			copyFile(filepath.Join("src", "gobind", "seq_android.h"), filepath.Join(javaPkg.Dir, "seq_android.h"))
+			copyFile(filepath.Join("src", "gobind", "GoArray.c"), filepath.Join(javaPkg.Dir, "GoArray.c.support"))
+			copyFile(filepath.Join("src", "gobind", "GoArray.go"), filepath.Join(javaPkg.Dir, "GoArray.go.support"))
 		}
 	case "go":
 		w, closer := writer(filepath.Join("src", "gobind", fname))

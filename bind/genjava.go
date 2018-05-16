@@ -627,8 +627,16 @@ func (g *JavaGen) jniType(T types.Type) string {
 			return "TODO"
 		}
 	case *types.Slice:
-		return "jbyteArray"
-
+		elem := g.javaType(T.Elem())
+		if elem == "jbyte" {
+			return "jbyteArray"
+		}
+		switch T.Elem().(type) {
+		case *types.Pointer:
+			return "jobject"
+		}
+		g.errorf("unsupported type: %s", T)
+		return "TODO"
 	case *types.Pointer:
 		if _, ok := T.Elem().(*types.Named); ok {
 			return g.jniType(T.Elem())
@@ -693,9 +701,23 @@ func (g *JavaGen) javaType(T types.Type) string {
 	case *types.Basic:
 		return g.javaBasicType(T)
 	case *types.Slice:
-		elem := g.javaType(T.Elem())
-		return elem + "[]"
-
+		switch e := T.Elem().(type) {
+		case *types.Basic:
+			switch e.Kind() {
+			case types.Uint8: // Byte.
+				elem := g.javaType(T.Elem())
+				return elem + "[]"
+			default:
+				g.errorf("unsupported type: %s", T)
+			}
+		case *types.Pointer:
+			if _, ok := e.Elem().(*types.Named); ok {
+				return "AbstractList<" + g.javaType(T.Elem()) + ">"
+			}
+			g.errorf("unsupported type: %s", T)
+		default:
+			g.errorf("unsupported type: %s", T)
+		}
 	case *types.Pointer:
 		if _, ok := T.Elem().(*types.Named); ok {
 			return g.javaType(T.Elem())
@@ -913,6 +935,8 @@ func (g *JavaGen) genJavaToC(varName string, t types.Type, mode varMode) {
 			default:
 				g.errorf("unsupported type: %s", t)
 			}
+		case *types.Pointer:
+			g.Printf("int32_t _%s = go_seq_to_refnum(env, %s);\n", varName, varName)
 		default:
 			g.errorf("unsupported type: %s", t)
 		}
@@ -957,6 +981,8 @@ func (g *JavaGen) genCToJava(toName, fromName string, t types.Type, mode varMode
 			default:
 				g.errorf("unsupported type: %s", t)
 			}
+		case *types.Pointer:
+			g.genSliceRefRead(toName, fromName, e.Elem())
 		default:
 			g.errorf("unsupported type: %s", t)
 		}
@@ -988,6 +1014,10 @@ func (g *JavaGen) genCToJava(toName, fromName string, t types.Type, mode varMode
 	default:
 		g.Printf("%s %s = (%s)%s;\n", g.jniType(t), toName, g.jniType(t), fromName)
 	}
+}
+
+func (g *JavaGen) genSliceRefRead(toName, fromName string, t types.Type) {
+	g.Printf("jobject %s = go_seq_to_java_array(env, %s, proxy_class_%s_%s);\n", toName, fromName, g.pkgPrefix, g.javaType(t))
 }
 
 func (g *JavaGen) genFromRefnum(toName, fromName string, t types.Type, o *types.TypeName) {
@@ -1725,6 +1755,7 @@ const (
 package %[1]s;
 
 import go.Seq;
+import java.util.AbstractList;
 
 `
 	cPreamble = `// JNI functions for the Go <=> Java bridge.

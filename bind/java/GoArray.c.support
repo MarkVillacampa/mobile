@@ -1,0 +1,76 @@
+#include "_cgo_export.h"
+#include "jni.h"
+#include "seq.h"
+
+
+void printjclass(JNIEnv* env, jclass klass)
+{
+    jclass thisklass = (*env)->GetObjectClass(env, klass);
+    jmethodID mid = (*env)->GetMethodID(env, thisklass, "getName", "()Ljava/lang/String;");
+    if (mid == NULL) {
+        printf("mid is null\n");
+    }
+
+    // Call the getName() to get a jstring object back
+    jstring strObj = (jstring)(*env)->CallObjectMethod(env, klass, mid);
+
+    // Now get the c string from the java jstring object
+    const char* str = (*env)->GetStringUTFChars(env, strObj, NULL);
+
+    // Print the class name
+    printf("class is: %s\n", str);
+
+    // Release the memory pinned char array
+    (*env)->ReleaseStringUTFChars(env, strObj, str);
+}
+
+JNIEXPORT jobject JNICALL
+Java_go_GoArray_get(JNIEnv *env, jobject this, jint index) {
+    int32_t refnum = go_seq_to_refnum_go(env, this);
+    jclass thisklass = (*env)->GetObjectClass(env, this);
+    jfieldID fieldid = (*env)->GetFieldID(env, thisklass, "klass", "Ljava/lang/Class;");
+    jclass klass = (*env)->GetObjectField(env, this, fieldid);
+    jmethodID methodid = (*env)->GetMethodID(env, klass, "<init>", "(I)V");
+    return go_seq_from_refnum(env, goArray_get(refnum, index), klass, methodid);
+}
+
+JNIEXPORT jobject JNICALL
+Java_go_GoArray_set(JNIEnv *env, jobject this, jint index, jobject obj) {
+    int32_t refnum = go_seq_to_refnum_go(env, this);
+    int32_t obj_refnum = go_seq_to_refnum_go(env, obj);
+    jclass thisklass = (*env)->GetObjectClass(env, this);
+    jfieldID fieldid = (*env)->GetFieldID(env, thisklass, "klass", "Ljava/lang/Class;");
+    jclass klass = (*env)->GetObjectField(env, this, fieldid);
+    jmethodID methodid = (*env)->GetMethodID(env, klass, "<init>", "(I)V");
+    return go_seq_from_refnum(env, goArray_set(refnum, index, obj_refnum), klass, methodid);
+}
+
+JNIEXPORT void JNICALL
+Java_go_GoArray_add(JNIEnv *env, jobject this, jint index, jobject obj) {
+    int32_t refnum = go_seq_to_refnum_go(env, this);
+    int32_t obj_refnum = go_seq_to_refnum_go(env, obj);
+    goArray_add(refnum, index, obj_refnum);
+}
+
+JNIEXPORT jobject JNICALL
+Java_go_GoArray_remove(JNIEnv *env, jobject this, jint index) {
+    int32_t refnum = go_seq_to_refnum_go(env, this);
+    jclass thisklass = (*env)->GetObjectClass(env, this);
+    jfieldID fieldid = (*env)->GetFieldID(env, thisklass, "klass", "Ljava/lang/Class;");
+    jclass klass = (*env)->GetObjectField(env, this, fieldid);
+    jmethodID methodid = (*env)->GetMethodID(env, klass, "<init>", "(I)V");
+    return go_seq_from_refnum(env, goArray_remove(refnum, index), klass, methodid);
+}
+
+JNIEXPORT jint JNICALL
+Java_go_GoArray_size(JNIEnv *env, jobject this) {
+    int32_t refnum = go_seq_to_refnum_go(env, this);
+    return goArray_size(refnum);
+}
+
+JNIEXPORT jint JNICALL
+Java_go_GoArray__1_1New(JNIEnv *env, jobject this, jclass klass) {
+    jmethodID methodid = (*env)->GetMethodID(env, klass, "<init>", "()V");
+    int32_t refnum = go_seq_to_refnum_go(env, (*env)->NewObject(env, klass, methodid));
+    return go_new_slice(refnum);
+}
