@@ -380,6 +380,14 @@ func (g *Generator) cgoType(t types.Type) string {
 			return "int64_t"
 		case types.Uint8: // types.Byte
 			return "uint8_t"
+		case types.Uint16:
+			return "uint16_t"
+		case types.Uint32:
+			return "uint32_t"
+		case types.Uint64:
+			return "uint64_t"
+		case types.Uint:
+			return "uint_t"
 		// TODO(crawshaw): case types.Uint, types.Uint16, types.Uint32, types.Uint64:
 		case types.Float32:
 			return "float"
@@ -499,6 +507,7 @@ func (g *Generator) isSupported(t types.Type) bool {
 			types.Int16,
 			types.Int32, types.UntypedRune, // types.Rune
 			types.Int64, types.UntypedInt,
+			types.Uint16, types.Uint32, types.Uint64,
 			types.Float32,
 			types.Float64, types.UntypedFloat,
 			types.String, types.UntypedString:
