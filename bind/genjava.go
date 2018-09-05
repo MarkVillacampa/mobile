@@ -318,7 +318,7 @@ func (g *JavaGen) genStruct(s structInfo) {
 
 		fdoc := doc.Member(f.Name())
 		g.javadoc(fdoc)
-		g.Printf("public final native %s %s();\n", g.javaType(f.Type()), f.Name())
+		g.Printf("public final native %s get%s();\n", g.javaType(f.Type()), f.Name())
 		g.javadoc(fdoc)
 		g.Printf("public final native void set%s(%s v);\n\n", f.Name(), g.javaType(f.Type()))
 	}
@@ -469,8 +469,8 @@ func (g *JavaGen) genObjectMethods(n string, fields []*types.Var, isStringer boo
 			continue
 		}
 		nf := f.Name()
-		g.Printf("%s this%s = %s();\n", g.javaType(f.Type()), nf, nf)
-		g.Printf("%s that%s = that.%s();\n", g.javaType(f.Type()), nf, nf)
+		g.Printf("%s this%s = get%s();\n", g.javaType(f.Type()), nf, nf)
+		g.Printf("%s that%s = that.get%s();\n", g.javaType(f.Type()), nf, nf)
 		if isJavaPrimitive(f.Type()) {
 			g.Printf("if (this%s != that%s) {\n    return false;\n}\n", nf, nf)
 		} else {
@@ -496,7 +496,7 @@ func (g *JavaGen) genObjectMethods(n string, fields []*types.Var, isStringer boo
 			g.Printf(", ")
 		}
 		idx++
-		g.Printf("%s()", f.Name())
+		g.Printf("get%s()", f.Name())
 	}
 	g.Printf("});\n")
 	g.Printf("}\n\n")
@@ -514,7 +514,7 @@ func (g *JavaGen) genObjectMethods(n string, fields []*types.Var, isStringer boo
 				continue
 			}
 			n := f.Name()
-			g.Printf(`b.append("%s:").append(%s()).append(",");`, n, n)
+			g.Printf(`b.append("%s:").append(get%s()).append(",");`, n, n)
 			g.Printf("\n")
 		}
 		g.Printf(`return b.append("}").toString();`)
@@ -784,7 +784,7 @@ func (g *JavaGen) genJNIFuncSignature(o *types.Func, sName string, jm *java.Func
 			g.Printf(java.JNIMangle(g.javaTypeName(sName)))
 		}
 	} else {
-		g.Printf(java.JNIMangle(g.className()))
+		g.Printf(g.className())
 	}
 	g.Printf("_")
 	if jm != nil {
@@ -894,7 +894,7 @@ func (g *JavaGen) genVar(o *types.Var) {
 
 	// getter
 	g.javadoc(doc)
-	g.Printf("public static native %s %s();\n\n", jType, o.Name())
+	g.Printf("public static native %s get%s();\n\n", jType, o.Name())
 }
 
 // genCRetClear clears the result value from a JNI call if an exception was
@@ -1142,7 +1142,7 @@ func (g *JavaGen) genJNIField(o *types.TypeName, f *types.Var) {
 
 	// getter
 	g.Printf("JNIEXPORT %s JNICALL\n", g.jniType(f.Type()))
-	g.Printf("Java_%s_%s_%s(JNIEnv *env, jobject this) {\n", g.jniPkgName(), n, java.JNIMangle(f.Name()))
+	g.Printf("Java_%s_%s_get%s(JNIEnv *env, jobject this) {\n", g.jniPkgName(), n, java.JNIMangle(f.Name()))
 	g.Indent()
 	g.Printf("int32_t o = go_seq_to_refnum_go(env, this);\n")
 	g.Printf("%s r0 = ", g.cgoType(f.Type()))
@@ -1171,7 +1171,7 @@ func (g *JavaGen) genJNIVar(o *types.Var) {
 
 	// getter
 	g.Printf("JNIEXPORT %s JNICALL\n", g.jniType(o.Type()))
-	g.Printf("Java_%s_%s_%s(JNIEnv *env, jclass clazz) {\n", g.jniPkgName(), g.className(), n)
+	g.Printf("Java_%s_%s_get%s(JNIEnv *env, jclass clazz) {\n", g.jniPkgName(), g.className(), n)
 	g.Indent()
 	g.Printf("%s r0 = ", g.cgoType(o.Type()))
 	g.Printf("var_get%s_%s();\n", g.pkgPrefix, o.Name())
